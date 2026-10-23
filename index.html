@@ -386,7 +386,6 @@
         measurementId: "G-DPTE497N8H"
     };
 
-    // Firebase 초기화
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
     }
@@ -475,7 +474,6 @@
         }
     }
 
-    // 경로 생성 시 특수문자 및 공백 완벽 제거
     function sanitizePath(str) {
         return str.replace(/[.#$\[\]/]/g, "_").replace(/\s+/g, "");
     }
@@ -492,16 +490,18 @@
     function handleKeyPress(event) {
         if (event.key === "Enter") {
             if (currentSchool) {
-                listenRealtimeAsList();
+                loadAndListenAsList();
                 document.getElementById('asSection').style.display = "block";
             }
         }
     }
 
-    function listenRealtimeAsList() {
+    function loadAndListenAsList() {
         const safePath = sanitizePath(currentSchool);
         const ref = database.ref('as_history/' + safePath);
 
+        // 기존 리스너 중복 방지 후 새로고침 연결
+        ref.off();
         ref.on('value', (snapshot) => {
             const data = snapshot.val();
             const container = document.getElementById('asList');
@@ -513,6 +513,7 @@
             }
 
             const keys = Object.keys(data).reverse();
+            keys.keys = keys.reverse(); // 최신순 정렬 보장
             keys.forEach((key) => {
                 const item = data[key];
                 const div = document.createElement('div');
@@ -531,8 +532,7 @@
                 container.appendChild(div);
             });
         }, (error) => {
-            console.error("데이터 불러오기 에러:", error);
-            alert("데이터를 불러오는 중 오류가 발생했습니다: " + error.message);
+            console.error("데이터 로드 오류:", error);
         });
     }
 
@@ -588,15 +588,15 @@
         const ref = database.ref('as_history/' + safePath);
 
         const payload = { date, engineer, content };
-
         const promise = (key === "") ? ref.push(payload) : ref.child(key).update(payload);
 
         promise.then(() => {
-            alert("저장되었습니다!");
             closeModal();
+            // 강제로 최신 데이터 다시 불러오기 실행
+            loadAndListenAsList();
         }).catch((error) => {
             console.error("저장 오류:", error);
-            alert("저장 실패 (권한 문제 가능성): " + error.message);
+            alert("저장 실패: " + error.message);
         });
     }
 </script>
