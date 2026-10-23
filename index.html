@@ -10,7 +10,7 @@
     
     <title>진성디지털 - 여수 학교 실시간 A/S 관리</title>
     
-    <!-- Firebase SDK (실시간 데이터베이스 연동) -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -375,7 +375,6 @@
 </div>
 
 <script>
-    // 전달해주신 Firebase 설정 정보 적용 완료
     const firebaseConfig = {
         apiKey: "AIzaSyBKzQRpRJbybbxV2Z1E5pfQyJRAYoLLlRI",
         authDomain: "jinsung-7995d.firebaseapp.com",
@@ -388,7 +387,9 @@
     };
 
     // Firebase 초기화
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const database = firebase.database();
 
     const officeSchoolList = [
@@ -474,8 +475,9 @@
         }
     }
 
+    // 경로 생성 시 특수문자 및 공백 완벽 제거
     function sanitizePath(str) {
-        return str.replace(/[.#$\[\]]/g, "_");
+        return str.replace(/[.#$\[\]/]/g, "_").replace(/\s+/g, "");
     }
 
     function showResult(title, badgeText, badgeClass) {
@@ -517,10 +519,10 @@
                 div.className = "as-item";
                 div.innerHTML = `
                     <div class="as-item-header">
-                        <span class="as-date">${item.date}</span>
-                        <span class="as-engineer">${item.engineer}</span>
+                        <span class="as-date">${item.date || '-'}</span>
+                        <span class="as-engineer">${item.engineer || '-'}</span>
                     </div>
-                    <div class="as-content">${item.content}</div>
+                    <div class="as-content">${item.content || '-'}</div>
                     <div class="btn-group">
                         <button class="btn-edit" onclick="openEditModal('${key}', '${item.date}', '${item.engineer}', '${escapeHtml(item.content)}')">수정</button>
                         <button class="btn-delete" onclick="deleteAsItem('${key}')">삭제</button>
@@ -528,17 +530,24 @@
                 `;
                 container.appendChild(div);
             });
+        }, (error) => {
+            console.error("데이터 불러오기 에러:", error);
+            alert("데이터를 불러오는 중 오류가 발생했습니다: " + error.message);
         });
     }
 
     function escapeHtml(str) {
+        if (!str) return "";
         return str.replace(/'/g, "\\'").replace(/"/g, "&quot;");
     }
 
     function deleteAsItem(key) {
         if (confirm("해당 A/S 이력을 삭제하시겠습니까?")) {
             const safePath = sanitizePath(currentSchool);
-            database.ref('as_history/' + safePath + '/' + key).remove();
+            database.ref('as_history/' + safePath + '/' + key).remove()
+                .catch((error) => {
+                    alert("삭제 실패: " + error.message);
+                });
         }
     }
 
@@ -571,20 +580,24 @@
         const content = document.getElementById('modalContent').value.trim();
 
         if (!date || !engineer || !content) {
-            alert("모든 필드를 입력해 주세요.");
+            alert("모든 필드(일자, 기사명, 내용)를 입력해 주세요.");
             return;
         }
 
         const safePath = sanitizePath(currentSchool);
         const ref = database.ref('as_history/' + safePath);
 
-        if (key === "") {
-            ref.push({ date, engineer, content });
-        } else {
-            ref.child(key).update({ date, engineer, content });
-        }
+        const payload = { date, engineer, content };
 
-        closeModal();
+        const promise = (key === "") ? ref.push(payload) : ref.child(key).update(payload);
+
+        promise.then(() => {
+            alert("저장되었습니다!");
+            closeModal();
+        }).catch((error) => {
+            console.error("저장 오류:", error);
+            alert("저장 실패 (권한 문제 가능성): " + error.message);
+        });
     }
 </script>
 
